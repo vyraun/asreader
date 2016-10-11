@@ -1,5 +1,10 @@
+# Theano is a Python library that allows you to define, optimize,
+# and evaluate mathematical expressions involving multi-dimensional arrays efficiently. 
 import theano
 import theano.tensor as tt
+
+# Blocks is a framework that helps you build neural network models on top of Theano. 
+# Bricks: Parametrized Theano operations.
 from blocks.bricks.cost import CategoricalCrossEntropy
 from blocks.bricks.lookup import LookupTable
 from blocks.initialization import Uniform
@@ -35,7 +40,7 @@ class ASReader(TextComprehensionBase):
         # Declaration of the Theano variables that come from the data stream
         ###################
 
-        # The context document.
+        # The context document (2D matrix of long type called context.)
         context_bt = tt.lmatrix('context')
         # Context document mask used to distinguish real symbols from the sequence and padding symbols that are at the end
         context_mask_bt = tt.matrix('context_mask')
@@ -51,8 +56,6 @@ class ASReader(TextComprehensionBase):
         # The candidates among which the answer is selected
         candidates_bi = tt.lmatrix("candidates")
         candidates_bi_mask = tt.matrix("candidates_mask")
-
-
 
         ###################
         # Network's components
@@ -89,9 +92,10 @@ class ASReader(TextComprehensionBase):
         memory_encoded_btf = context_encoder.apply(context_embedding_tbf, context_mask_bt.T).dimshuffle(1,0,2)
         memory_encoded_btf.name = "memory_encoded_btf"
 
-        ### Correspondingly, read the query
+        ### Correspondingly, read the query.
         x_embedded_tbf = lookup.apply(question_bt.T)
         x_encoded_btf = question_encoder.apply(x_embedded_tbf, question_mask_bt.T).dimshuffle(1,0,2)
+        
         # The query encoding is a concatenation of the final states of the forward and backward GRU encoder
         x_forward_encoded_bf = x_encoded_btf[:,-1,0:hidden_states]
         x_backward_encoded_bf = x_encoded_btf[:,0,hidden_states:hidden_states*2]
@@ -109,7 +113,6 @@ class ASReader(TextComprehensionBase):
         if self.args.weighted_att:
             # compute weighted attention over original word vectors
             att_weighted_responses_bf = theano.tensor.batched_dot(mem_attention_bt, context_embedding_tbf.dimshuffle(1,0,2))
-
 
             # compare desired response to all candidate responses
             # select relevant candidate answer words
@@ -154,13 +157,11 @@ class ASReader(TextComprehensionBase):
         cost = CategoricalCrossEntropy().apply(y.flatten(), y_hat)
         cost.name = "cost"
 
-
         predicted_response_index = tt.argmax(y_hat,axis=1)
         accuracy = tt.eq(y,predicted_response_index).mean()
         accuracy.name = "accuracy"
 
         return cost, accuracy, mem_attention_bt, y_hat, context_bt, candidates_bi, candidates_bi_mask, y, context_mask_bt, question_bt, question_mask_bt
-
 
 exp = ASReader()
 exp.execute()
